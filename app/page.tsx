@@ -28,6 +28,21 @@ import {
   PieChart,
   RefreshCw,
   ZoomIn,
+  Settings,
+  CloudOff,
+  Bell,
+  Shield,
+  Globe,
+  Palette,
+  Calendar,
+  Download,
+  Trash2,
+  HardDrive,
+  AlertTriangle,
+  ExternalLink,
+  Fingerprint,
+  CalendarClock,
+  TrendingDown,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -52,6 +67,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   Drawer,
   DrawerContent,
@@ -290,7 +315,7 @@ type Profile = typeof INITIAL_PROFILE
 type Record = (typeof INITIAL_RECORDS)[0]
 
 export default function ReliefTrackApp() {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "records" | "profile">("dashboard")
+  const [activeTab, setActiveTab] = useState<"dashboard" | "records" | "profile" | "settings">("dashboard")
   const [profile, setProfile] = useState<Profile>(INITIAL_PROFILE)
   const [records, setRecords] = useState<Record[]>(INITIAL_RECORDS)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -302,7 +327,32 @@ export default function ReliefTrackApp() {
   const [selectedRecord, setSelectedRecord] = useState<Record | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const { theme, setTheme } = useTheme()
+
+  // Settings state
+  const [settings, setSettings] = useState({
+    // Storage & Backup
+    googleDriveConnected: false,
+    googleDriveEmail: "",
+    lastSyncTime: "",
+    autoUploadReceipts: true,
+    storageUsed: 45, // MB
+
+    // Notifications
+    taxDeadlineReminders: true,
+    lowReliefAlerts: true,
+    weeklySummary: false,
+    lhdnUpdates: true,
+
+    // Security
+    biometricLock: false,
+
+    // Preferences
+    language: "en" as "en" | "ms",
+    themePreference: "system" as "light" | "dark" | "system",
+    defaultTaxYear: "2025" as "2025" | "2026",
+  })
 
   // Form state for new record
   const [newRecord, setNewRecord] = useState({
@@ -505,8 +555,28 @@ export default function ReliefTrackApp() {
     )
   }
 
+  // Calculate days until tax deadline
+  const getTaxDeadlineInfo = () => {
+    const deadline = new Date("2026-04-30")
+    const today = new Date()
+    const diffTime = deadline.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return { days: diffDays, date: "30 April 2026" }
+  }
+
+  // Estimate tax savings (simplified calculation based on claimed reliefs)
+  const estimateTaxSavings = () => {
+    // Simplified: assume average tax rate of ~20% on relief amounts
+    const estimatedSavings = Math.round(totalClaimed * 0.2)
+    return estimatedSavings
+  }
+
   // Dashboard Tab
-  const DashboardTab = () => (
+  const DashboardTab = () => {
+    const deadlineInfo = getTaxDeadlineInfo()
+    const estimatedSavings = estimateTaxSavings()
+
+    return (
     <ScrollArea className="h-[calc(100vh-140px)]">
       <div className="space-y-4 p-4 pb-8">
         {/* Header */}
@@ -516,7 +586,7 @@ export default function ReliefTrackApp() {
               <h1 className="text-xl font-bold text-foreground">ReliefTrack MY</h1>
               <MalaysiaFlag className="h-4 w-6" />
             </div>
-            <p className="text-sm text-muted-foreground">Year of Assessment 2025</p>
+            <p className="text-sm text-muted-foreground">Year of Assessment {settings.defaultTaxYear}</p>
           </div>
           <div className="flex items-center gap-2">
             {mounted && (
@@ -537,6 +607,28 @@ export default function ReliefTrackApp() {
           Hi, <span className="font-semibold">{profile.name}</span>
         </p>
 
+        {/* Tax Filing Deadline Countdown */}
+        <Card className="overflow-hidden border-0 bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/20">
+                <CalendarClock className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-white/90">Tax Filing Deadline</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold">{deadlineInfo.days}</span>
+                  <span className="text-sm text-white/80">days left</span>
+                </div>
+                <p className="text-xs text-white/75">until {deadlineInfo.date}</p>
+              </div>
+              <div className="text-right">
+                <Clock className="ml-auto h-5 w-5 text-white/60" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Total Relief Card */}
         <Card className="overflow-hidden border-0 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white shadow-lg">
           <CardContent className="p-5">
@@ -550,6 +642,26 @@ export default function ReliefTrackApp() {
                 </div>
               </div>
               <CircularProgress value={totalClaimed} max={totalPossible} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tax Savings Estimator */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <TrendingDown className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">Estimated Tax Savings</p>
+                <p className="text-xl font-bold text-primary">~{formatRM(estimatedSavings)}</p>
+                <p className="text-xs text-muted-foreground">this assessment year</p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Info className="h-3 w-3" />
+              <span>Estimate based on average tax bracket. <button className="text-primary underline-offset-2 hover:underline">Learn more</button></span>
             </div>
           </CardContent>
         </Card>
@@ -648,7 +760,7 @@ export default function ReliefTrackApp() {
         </div>
       </div>
     </ScrollArea>
-  )
+  )}
 
   // Records Tab
   const RecordsTab = () => (
@@ -1098,54 +1210,374 @@ export default function ReliefTrackApp() {
           </CardContent>
         </Card>
 
-        {/* Theme Toggle */}
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-3">
-              {mounted && (theme === "dark" ? (
-                <Moon className="h-5 w-5 text-muted-foreground" />
-              ) : (
-                <Sun className="h-5 w-5 text-muted-foreground" />
-              ))}
-              <div>
-                <p className="text-sm font-medium text-foreground">Dark Mode</p>
-                <p className="text-xs text-muted-foreground">Toggle dark/light theme</p>
-              </div>
-            </div>
-            {mounted && (
-              <Switch
-                checked={theme === "dark"}
-                onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* App Info */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <Info className="h-5 w-5 text-muted-foreground" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">ReliefTrack MY</p>
-                <p className="text-xs text-muted-foreground">Version 1.0.0</p>
-              </div>
-              <MalaysiaFlag className="h-5 w-8" />
-            </div>
-            <Separator className="my-3" />
-            <p className="text-xs text-muted-foreground">
-              This app is for personal tax planning purposes only. Always verify with LHDN for official
-              tax relief eligibility and amounts.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Button variant="outline" className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300">
-          Log Out
+        {/* Save Profile Button */}
+        <Button className="w-full bg-primary hover:bg-primary/90">
+          Save Profile
         </Button>
       </div>
     </ScrollArea>
   )
+
+  // Settings Tab
+  const SettingsTab = () => {
+    const handleConnectGoogleDrive = () => {
+      // Simulate Google Drive connection
+      setSettings({
+        ...settings,
+        googleDriveConnected: true,
+        googleDriveEmail: "dandylau@gmail.com",
+        lastSyncTime: new Date().toLocaleString(),
+      })
+    }
+
+    const handleDisconnectGoogleDrive = () => {
+      setSettings({
+        ...settings,
+        googleDriveConnected: false,
+        googleDriveEmail: "",
+        lastSyncTime: "",
+      })
+    }
+
+    const handleBackupNow = () => {
+      setSettings({
+        ...settings,
+        lastSyncTime: new Date().toLocaleString(),
+      })
+    }
+
+    const handleExportRecords = () => {
+      // Simulate export
+      alert("Exporting records as CSV and PDF...")
+    }
+
+    const handleClearCache = () => {
+      alert("OCR cache cleared!")
+    }
+
+    const handleDeleteAllRecords = () => {
+      setRecords([])
+      setShowDeleteDialog(false)
+    }
+
+    return (
+      <ScrollArea className="h-[calc(100vh-140px)]">
+        <div className="space-y-6 p-4 pb-8">
+          {/* Storage & Backup */}
+          <div className="space-y-3">
+            <h2 className="flex items-center gap-2 font-semibold text-foreground">
+              <HardDrive className="h-4 w-4 text-primary" />
+              Storage & Backup
+            </h2>
+            <Card>
+              <CardContent className="space-y-4 p-4">
+                {!settings.googleDriveConnected ? (
+                  <Button
+                    className="w-full gap-2 bg-white text-foreground border border-input hover:bg-muted"
+                    onClick={handleConnectGoogleDrive}
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-label="Google Drive">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                    </svg>
+                    Connect Google Drive
+                  </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+                          <Check className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Connected</p>
+                          <p className="text-xs text-muted-foreground">{settings.googleDriveEmail}</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={handleDisconnectGoogleDrive}>
+                        <CloudOff className="mr-1 h-4 w-4" />
+                        Disconnect
+                      </Button>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Last synced: {settings.lastSyncTime || "Never"}
+                    </div>
+                  </div>
+                )}
+
+                <Separator />
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Auto-upload receipts</p>
+                    <p className="text-xs text-muted-foreground">Sync records to Google Drive</p>
+                  </div>
+                  <Switch
+                    checked={settings.autoUploadReceipts}
+                    onCheckedChange={(checked) => setSettings({ ...settings, autoUploadReceipts: checked })}
+                    disabled={!settings.googleDriveConnected}
+                  />
+                </div>
+
+                <Button variant="outline" className="w-full" onClick={handleBackupNow} disabled={!settings.googleDriveConnected}>
+                  Backup Now
+                </Button>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Storage used</span>
+                    <span className="font-medium">{settings.storageUsed} MB / 100 MB</span>
+                  </div>
+                  <Progress value={settings.storageUsed} className="h-2" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Notifications */}
+          <div className="space-y-3">
+            <h2 className="flex items-center gap-2 font-semibold text-foreground">
+              <Bell className="h-4 w-4 text-primary" />
+              Notifications
+            </h2>
+            <Card>
+              <CardContent className="space-y-4 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Tax deadline reminders</p>
+                    <p className="text-xs text-muted-foreground">Get notified before filing deadlines</p>
+                  </div>
+                  <Switch
+                    checked={settings.taxDeadlineReminders}
+                    onCheckedChange={(checked) => setSettings({ ...settings, taxDeadlineReminders: checked })}
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Low relief utilization alerts</p>
+                    <p className="text-xs text-muted-foreground">Alert when reliefs are underutilized</p>
+                  </div>
+                  <Switch
+                    checked={settings.lowReliefAlerts}
+                    onCheckedChange={(checked) => setSettings({ ...settings, lowReliefAlerts: checked })}
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Weekly summary</p>
+                    <p className="text-xs text-muted-foreground">Receive weekly relief summary</p>
+                  </div>
+                  <Switch
+                    checked={settings.weeklySummary}
+                    onCheckedChange={(checked) => setSettings({ ...settings, weeklySummary: checked })}
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">New LHDN updates</p>
+                    <p className="text-xs text-muted-foreground">Get notified about tax law changes</p>
+                  </div>
+                  <Switch
+                    checked={settings.lhdnUpdates}
+                    onCheckedChange={(checked) => setSettings({ ...settings, lhdnUpdates: checked })}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Security */}
+          <div className="space-y-3">
+            <h2 className="flex items-center gap-2 font-semibold text-foreground">
+              <Shield className="h-4 w-4 text-primary" />
+              Security
+            </h2>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Fingerprint className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Biometric Lock</p>
+                      <p className="text-xs text-muted-foreground">Face ID / Fingerprint</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.biometricLock}
+                    onCheckedChange={(checked) => setSettings({ ...settings, biometricLock: checked })}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Preferences */}
+          <div className="space-y-3">
+            <h2 className="flex items-center gap-2 font-semibold text-foreground">
+              <Palette className="h-4 w-4 text-primary" />
+              Preferences
+            </h2>
+            <Card>
+              <CardContent className="space-y-4 p-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm">Language</Label>
+                  </div>
+                  <Select
+                    value={settings.language}
+                    onValueChange={(value: "en" | "ms") => setSettings({ ...settings, language: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="ms">Bahasa Melayu</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    {mounted && (settings.themePreference === "dark" || (settings.themePreference === "system" && theme === "dark") ? (
+                      <Moon className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Sun className="h-4 w-4 text-muted-foreground" />
+                    ))}
+                    <Label className="text-sm">Theme</Label>
+                  </div>
+                  <Select
+                    value={settings.themePreference}
+                    onValueChange={(value: "light" | "dark" | "system") => {
+                      setSettings({ ...settings, themePreference: value })
+                      setTheme(value)
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="light">Light</SelectItem>
+                      <SelectItem value="dark">Dark</SelectItem>
+                      <SelectItem value="system">System</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm">Default Tax Year</Label>
+                  </div>
+                  <Select
+                    value={settings.defaultTaxYear}
+                    onValueChange={(value: "2025" | "2026") => setSettings({ ...settings, defaultTaxYear: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2025">2025</SelectItem>
+                      <SelectItem value="2026">2026</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Data Management */}
+          <div className="space-y-3">
+            <h2 className="flex items-center gap-2 font-semibold text-foreground">
+              <HardDrive className="h-4 w-4 text-primary" />
+              Data Management
+            </h2>
+            <Card>
+              <CardContent className="space-y-3 p-4">
+                <Button variant="outline" className="w-full justify-start gap-2" onClick={handleExportRecords}>
+                  <Download className="h-4 w-4" />
+                  Export All Records (CSV + PDF)
+                </Button>
+                <Button variant="outline" className="w-full justify-start gap-2" onClick={handleClearCache}>
+                  <Trash2 className="h-4 w-4" />
+                  Clear OCR Cache
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Delete All Records
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* About */}
+          <div className="space-y-3">
+            <h2 className="flex items-center gap-2 font-semibold text-foreground">
+              <Info className="h-4 w-4 text-primary" />
+              About
+            </h2>
+            <Card>
+              <CardContent className="space-y-4 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600">
+                    <MalaysiaFlag className="h-6 w-10" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">ReliefTrack MY</p>
+                    <p className="text-xs text-muted-foreground">Version 1.0.0</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-950/30">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      This app is for personal tax planning purposes only. Tax relief categories and limits are based on LHDN guidelines. Always verify with LHDN for official eligibility and amounts.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <button className="flex items-center justify-between rounded-lg p-2 text-sm text-foreground transition-colors hover:bg-muted">
+                    Privacy Policy
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  <button className="flex items-center justify-between rounded-lg p-2 text-sm text-foreground transition-colors hover:bg-muted">
+                    Terms of Service
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  <button className="flex items-center justify-between rounded-lg p-2 text-sm text-foreground transition-colors hover:bg-muted">
+                    LHDN Official Website
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Button variant="outline" className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300">
+            Log Out
+          </Button>
+        </div>
+      </ScrollArea>
+    )
+  }
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background">
@@ -1154,6 +1586,7 @@ export default function ReliefTrackApp() {
         {activeTab === "dashboard" && <DashboardTab />}
         {activeTab === "records" && <RecordsTab />}
         {activeTab === "profile" && <ProfileTab />}
+        {activeTab === "settings" && <SettingsTab />}
       </main>
 
       {/* Add Record Modal */}
@@ -1299,13 +1732,40 @@ export default function ReliefTrackApp() {
         </DrawerContent>
       </Drawer>
 
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Delete All Records
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. All your tax relief records and receipts will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                setRecords([])
+                setShowDeleteDialog(false)
+              }}
+            >
+              Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Bottom Navigation */}
       <nav className="sticky bottom-0 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="flex items-center justify-around py-2">
+        <div className="relative flex items-center justify-around py-2">
           <button
             onClick={() => setActiveTab("dashboard")}
             className={cn(
-              "flex flex-col items-center gap-1 px-4 py-2 transition-colors",
+              "flex flex-col items-center gap-1 px-3 py-2 transition-colors",
               activeTab === "dashboard" ? "text-primary" : "text-muted-foreground"
             )}
           >
@@ -1316,7 +1776,7 @@ export default function ReliefTrackApp() {
           <button
             onClick={() => setActiveTab("records")}
             className={cn(
-              "flex flex-col items-center gap-1 px-4 py-2 transition-colors",
+              "flex flex-col items-center gap-1 px-3 py-2 transition-colors",
               activeTab === "records" ? "text-primary" : "text-muted-foreground"
             )}
           >
@@ -1327,15 +1787,19 @@ export default function ReliefTrackApp() {
           {/* Floating Action Button */}
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex h-14 w-14 -translate-y-4 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+            className="absolute left-1/2 -translate-x-1/2 -translate-y-6 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+            aria-label="Add new record"
           >
             <Plus className="h-7 w-7" />
           </button>
 
+          {/* Spacer for FAB */}
+          <div className="w-14" />
+
           <button
             onClick={() => setActiveTab("profile")}
             className={cn(
-              "flex flex-col items-center gap-1 px-4 py-2 transition-colors",
+              "flex flex-col items-center gap-1 px-3 py-2 transition-colors",
               activeTab === "profile" ? "text-primary" : "text-muted-foreground"
             )}
           >
@@ -1343,8 +1807,16 @@ export default function ReliefTrackApp() {
             <span className="text-xs font-medium">Profile</span>
           </button>
 
-          {/* Empty space for balance */}
-          <div className="w-16" />
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={cn(
+              "flex flex-col items-center gap-1 px-3 py-2 transition-colors",
+              activeTab === "settings" ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            <Settings className="h-5 w-5" />
+            <span className="text-xs font-medium">Settings</span>
+          </button>
         </div>
       </nav>
     </div>
